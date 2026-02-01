@@ -1,0 +1,59 @@
+services:
+  norish:
+    image: norishapp/norish:latest
+    container_name: Norish
+    ports:
+      - 3332:3000
+    user: 1026:100
+    volumes:
+      - /volume1/docker/norish/data:/app/uploads:rw
+    environment:
+      AUTH_URL: http://nas1:3332
+      DATABASE_URL: postgres://norishuser:norishpass@norish-db:5432/norish
+      MASTER_KEY: ${NORISH_SECRET_KEY}
+      CHROME_WS_ENDPOINT: ws://chrome-headless:3000
+      REDIS_URL: redis://redis:6379
+      TRUSTED_ORIGINS: http://nas1:3332
+    depends_on:
+      - db
+      - redis
+    restart: on-failure:5
+
+  db:
+    image: postgres:18
+    container_name: Norish-DB
+    hostname: norish-db
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "norish", "-U", "norishuser"]
+      timeout: 45s
+      interval: 10s
+      retries: 10
+    volumes:
+      - /volume1/docker/norish/db:/var/lib/postgresql:rw
+    environment:
+      POSTGRES_DB: norish
+      POSTGRES_USER: norishuser
+      POSTGRES_PASSWORD: ${NORISHDB_PASSWORD}
+    restart: on-failure:5
+
+  chrome-headless:
+    image: zenika/alpine-chrome:latest
+    container_name: Norish-CHROME
+    command:
+      - "--no-sandbox"
+      - "--disable-gpu"
+      - "--disable-dev-shm-usage"
+      - "--remote-debugging-address=0.0.0.0"
+      - "--remote-debugging-port=3000"
+      - "--headless"
+    restart: on-failure:5
+
+  redis:
+    image: redis
+    container_name: Norish-REDIS
+    hostname: norish-redis
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping || exit 1"]
+    volumes:
+      - /volume1/docker/norish/redis:/data:rw
+    restart: on-failure:5
